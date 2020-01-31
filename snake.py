@@ -10,8 +10,8 @@ WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
-height = 1000
-width = 1000
+height = 750
+width = 750
 rows = 25
 surface = pygame.display.set_mode((width, height))
 
@@ -54,6 +54,27 @@ class Snake():
             self.fail = True
             self.body.append(old_tail)
 
+    def turn(self, dir):
+        ''' The function for changing the direction of the snake, where 0 is UP,
+        1 is right, 2 is down, and 3 is left.
+        '''
+        if dir == 0:
+            if self.diry != 1:
+                self.dirx = 0
+                self.diry = -1
+        elif dir == 1:
+            if self.dirx != -1:
+                self.dirx = 1
+                self.diry = 0
+        elif dir == 2:
+            if self.diry != -1:
+                self.diry = 1
+                self.dirx = 0
+        elif dir == 3:
+            if self.dirx != 1:
+                self.dirx = -1
+                self.diry = 0
+
     def max(self, pos):
         # Check if the box is at the boundaries
         if pos[0] >= rows or pos[1] >= rows or pos[0] < 0 or pos[1] < 0:
@@ -63,29 +84,28 @@ class Snake():
 
 
 def createFruit(snake):
-    # Create an array which if the snake occupys that space it will be True
-    snakeGrid = [False] * (rows ** 2)
-    for i in range(len(snake.body)):
-        place = snake.body[i][0] + snake.body[i][1] * rows
-        snakeGrid[place] = True
-    # the random number corresponding to an empty grid
-    randGrid = random.randint(0, rows**2 - len(snake.body))
-    # We find the real position of the fruit by counting to the
-    # rand grid and skipping over any grids that are filled with a snake
-    gridPos = 0
-    counter = 0
-    freePosition = False
-    while not freePosition:
-        if gridPos == randGrid:
-            if snakeGrid[counter] is False:
-                freePosition = True
-                break
-        elif snakeGrid[counter] is False:
-            gridPos += 1
-        counter += 1
-    pos = (counter % rows, counter // rows)
-    drawCircle(pos)
-    return pos
+    fruitBox = random.randint(0, rows ** 2 - len(snake.body))
+    # Create 2D array and fill it with False
+    gameGrid = [x[:] for x in [[False] * rows] * rows]
+    print(snake.body)
+    # Where there is part of the snake on a tile make that True
+    for sPos in snake.body:
+        gameGrid[sPos[0]][sPos[1]] = True
+
+    # Loop over fruitBox number of False entries in the grid
+    loop_num = -1
+    box_num = -1
+    while loop_num != fruitBox:
+        box_num += 1
+        coord = numtocoord(box_num)
+        if gameGrid[coord[0]][coord[1]] is False:
+            loop_num += 1
+    drawCircle(coord)
+    return coord
+
+
+def numtocoord(num):
+    return (num // rows, num % rows)
 
 
 def drawCircle(pos, color=(RED)):
@@ -132,14 +152,28 @@ def drawWindow(height, rows):
 class Game():
     def __init__(self):
         pygame.init()
-
-    def reset(self):
         self.screen = pygame.display.set_mode((width, height))
         self.snake = Snake()
         self.clock = pygame.time.Clock()
 
+    def reset(self):
+        surface.fill(BLACK)
+        self.snake.__init__()
 
+    def step(self, dir):
+        self.snake.turn(dir)
+        if dir != -1:
+            if not self.snake.fail:
+                self.snake.move()
+                self.checkFail()
 
+    def render(self):
+        pygame.display.update()
+        self.clock.tick(FPS)
+
+    def checkFail(self):
+        if self.snake.fail:
+            gameOver()
 
 
 def main():
@@ -147,7 +181,6 @@ def main():
     # drawWindow(height, rows)
     snek = Snake()
     start = False
-    fail = False
     pygame.display.set_caption("Snek")
     pygame.init()
 
@@ -156,41 +189,30 @@ def main():
         if snek.fail:
             gameOver()
             start = False
-            fail = True
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
                 exit()
             elif event.type == KEYDOWN:
-                if fail:
+                if snek.fail:
                     surface.fill(BLACK)
                     snek.__init__()
-                    fail = False
-                    print(snek.body)
                 elif (event.key == (K_LEFT or K_a)):
-                    if snek.dirx != 1:
-                        snek.dirx = -1
-                        snek.diry = 0
-                        start = True
-                        break
+                    snek.turn(3)
+                    start = True
+                    break
                 elif (event.key == (K_RIGHT or K_d)):
-                    if snek.dirx != -1:
-                        snek.dirx = 1
-                        snek.diry = 0
-                        start = True
-                        break
+                    snek.turn(1)
+                    start = True
+                    break
                 elif (event.key == (K_DOWN or K_s)):
-                    if snek.diry != -1:
-                        snek.diry = 1
-                        snek.dirx = 0
-                        start = True
-                        break
+                    snek.turn(2)
+                    start = True
+                    break
                 elif (event.key == (K_UP or K_w)):
-                    if snek.diry != 1:
-                        snek.diry = -1
-                        snek.dirx = 0
-                        start = True
-                        break
+                    snek.turn(0)
+                    start = True
+                    break
         # drawWindow(height, rows)
         if start:
             snek.move()
