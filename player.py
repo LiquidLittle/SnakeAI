@@ -1,11 +1,5 @@
-import snake
-# import numpy as np
-import random
 import pygame
 from pygame.locals import *
-# from tensorflow.keras import Model, Sequential
-# from tensorflow.keras.layers import Dense, Embedding, Reshape
-# from tensorflow.keras.optimizers import Adam
 from snake import Game as gm
 
 game = gm()
@@ -20,6 +14,8 @@ while True:
         elif event.type == KEYDOWN:
             if game.snake.fail:
                 game.reset()
+            elif (event.key == K_SPACE):
+                print(game.step(action))
             elif (event.key == (K_LEFT or K_a)):
                 action = 3
                 break

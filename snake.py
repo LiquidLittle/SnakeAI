@@ -1,4 +1,4 @@
-import math
+import numpy as np
 import pygame
 import random
 from collections import deque
@@ -20,9 +20,10 @@ class Snake():
 
     def __init__(self):
         # the leftmost entry is considered the head
-        pos = (random.randint(0, rows), random.randint(0, rows))
+        pos = (random.randint(0, rows - 1), random.randint(0, rows - 1))
         self.body = deque()
         self.body.append(pos)
+        self.reward = 0
         self.dirx = 0
         self.diry = 0
         self.fail = False
@@ -33,11 +34,12 @@ class Snake():
         # Take the tail of body and make it the new head
         old_tail = self.body.pop()
         # Move the new head one direction towards dirx or diry
+        self.reward = 1
         if len(self.body) == 0:
-            new_head = (old_tail[0] + 1*self.dirx, old_tail[1] + 1*self.diry)
+            new_head = (old_tail[0] + self.dirx, old_tail[1] + self.diry)
         else:
-            new_head = (self.body[0][0] + 1*self.dirx,
-                        self.body[0][1] + 1*self.diry)
+            new_head = (self.body[0][0] + self.dirx,
+                        self.body[0][1] + self.diry)
         if not self.max(new_head):
             if new_head in self.body:
                 self.fail = True
@@ -48,6 +50,7 @@ class Snake():
             else:
                 self.body.append(old_tail)
                 self.body.appendleft(new_head)
+                self.reward = 100
                 self.fruit = createFruit(self)
             drawBox(new_head)
         else:
@@ -68,8 +71,8 @@ class Snake():
                 self.diry = 0
         elif dir == 2:
             if self.diry != -1:
-                self.diry = 1
                 self.dirx = 0
+                self.diry = 1
         elif dir == 3:
             if self.dirx != 1:
                 self.dirx = -1
@@ -82,16 +85,54 @@ class Snake():
         else:
             return False
 
+    def observation(self):
+        ''' The snakes "eyes". Returns a 5x5 array centered at the snakes head
+            where 0 representing empty spaces, 1 representing snake blocks and
+            2 representing the fruit and the angle at which the head is
+            relative to the fruit.
+        '''
+        head = self.body[0]
+        headv = np.array(head) - np.array((head[0] + self.dirx, head[1]
+                                          + self.diry))
+        fruitv = np.array(head) - np.array(self.fruit)
+        angle = np.math.atan2(np.linalg.det([headv, fruitv]), np.dot(headv,
+                                                                     fruitv))
+        # Create a 2d grid with 0 representing empty spaces, 1 representing
+        # snake blocks and 2 representing the fruit
+        grid = np.zeros((5, 5), dtype='int8')
+        for i in range(0, len(grid)):
+            for j in range(0, len(grid[i])):
+                # i, j + True coord of head - (2, 2)
+                if (i + head[0] - 2, j + head[1] - 2) in self.body or \
+                        (i + head[0] - 2) < 0 or (j + head[1] - 2) < 0:
+                    grid[j][i] = 1
+                elif (i + head[0] - 2, j + head[1] - 2) == self.fruit:
+                    grid[j][i] = 2
+        # How many times to rotate the grid so its facing the same direction
+        # as the head
+
+        rotate = 0
+        if self.dirx == 1:
+            rotate = 1
+        elif self.diry == 1:
+            rotate = 2
+        elif self.dirx == -1:
+            rotate = 3
+
+        grid = np.rot90(grid, rotate)
+        return grid, angle
+
 
 def createFruit(snake):
     fruitBox = random.randint(0, rows ** 2 - len(snake.body))
     # Create 2D array and fill it with False
     gameGrid = [x[:] for x in [[False] * rows] * rows]
-    print(snake.body)
     # Where there is part of the snake on a tile make that True
     for sPos in snake.body:
-        gameGrid[sPos[0]][sPos[1]] = True
-
+        try:
+            gameGrid[sPos[0]][sPos[1]] = True
+        except IndexError:
+            print("Error: Pos = " + str(sPos))
     # Loop over fruitBox number of False entries in the grid
     loop_num = -1
     box_num = -1
@@ -166,6 +207,8 @@ class Game():
             if not self.snake.fail:
                 self.snake.move()
                 self.checkFail()
+        return (self.snake.observation(), self.snake.reward, self.snake.fail,
+                len(self.snake.body))
 
     def render(self):
         pygame.display.update()
